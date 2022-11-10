@@ -43,3 +43,43 @@ nyc_airbnb =
   select(price, stars, borough, neighbourhood, room_type)
 ```
 
+## Fit the first model
+
+```{r}
+fit = lm(price ~ stars + borough, data = nyc_airbnb)
+
+summary(fit)
+coef(fit)
+
+fit %>% 
+  broom::tidy() %>% 
+  mutate(
+    term = str_replace(term, "borough", "Borough: ")
+  ) %>% 
+  select(term, estimate, p.value) %>% 
+  knitr::kable(digits = 2)
+```
+
+Let's change reference category.
+
+```{r}
+fit = 
+  nyc_airbnb %>% 
+  mutate(
+    borough = fct_infreq(borough)
+  ) %>% 
+  lm(price ~ stars + borough, data = .)
+
+fit %>% 
+  broom::tidy() %>% 
+  mutate(
+    term = str_replace(term, "borough", "Borough: ")
+  ) %>% 
+  select(term, estimate, p.value) %>% 
+  knitr::kable(digits = 2)
+
+fit %>% 
+  broom::glance() %>% 
+  select(AIC)
+```
+
