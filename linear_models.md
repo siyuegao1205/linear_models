@@ -330,3 +330,103 @@ nyc_airbnb %>%
     ## 2 stars                     21.0      2.98      7.05 1.90e- 12
     ## 3 room_typePrivate room    -92.2      2.72    -34.0  6.40e-242
     ## 4 room_typeShared room    -106.       9.43    -11.2  4.15e- 29
+
+Mixed models.
+
+``` r
+nyc_airbnb %>% 
+  filter(borough == "Manhattan") %>% 
+  lme4::lmer(price ~ stars + room_type + (1 + room_type | neighbourhood), data = .) %>% 
+  broom.mixed::tidy()
+```
+
+    ## boundary (singular) fit: see help('isSingular')
+
+    ## # A tibble: 11 × 6
+    ##    effect   group         term                          estimate std.e…¹ stati…²
+    ##    <chr>    <chr>         <chr>                            <dbl>   <dbl>   <dbl>
+    ##  1 fixed    <NA>          (Intercept)                    250.      26.6    9.41 
+    ##  2 fixed    <NA>          stars                           -3.16     5.00  -0.631
+    ##  3 fixed    <NA>          room_typePrivate room         -124.       7.80 -15.9  
+    ##  4 fixed    <NA>          room_typeShared room          -157.      12.9  -12.2  
+    ##  5 ran_pars neighbourhood sd__(Intercept)                 59.3     NA     NA    
+    ##  6 ran_pars neighbourhood cor__(Intercept).room_typePr…   -0.987   NA     NA    
+    ##  7 ran_pars neighbourhood cor__(Intercept).room_typeSh…   -1.00    NA     NA    
+    ##  8 ran_pars neighbourhood sd__room_typePrivate room       36.7     NA     NA    
+    ##  9 ran_pars neighbourhood cor__room_typePrivate room.r…    0.992   NA     NA    
+    ## 10 ran_pars neighbourhood sd__room_typeShared room        43.6     NA     NA    
+    ## 11 ran_pars Residual      sd__Observation                198.      NA     NA    
+    ## # … with abbreviated variable names ¹​std.error, ²​statistic
+
+## Binary outcomes
+
+``` r
+baltimore_df = 
+  read_csv("data/homicide-data.csv") %>% 
+  filter(city == "Baltimore") %>% 
+  mutate(
+    resolved = as.numeric(disposition == "Closed by arrest"),
+    victim_age = as.numeric(victim_age),
+    victim_race = fct_relevel(victim_race, "White")
+  ) %>% 
+  select(resolved, victim_age, victim_race, victim_sex)
+```
+
+    ## Rows: 52179 Columns: 12
+    ## ── Column specification ────────────────────────────────────────────────────────
+    ## Delimiter: ","
+    ## chr (9): uid, victim_last, victim_first, victim_race, victim_age, victim_sex...
+    ## dbl (3): reported_date, lat, lon
+    ## 
+    ## ℹ Use `spec()` to retrieve the full column specification for this data.
+    ## ℹ Specify the column types or set `show_col_types = FALSE` to quiet this message.
+
+Fit a logistic regression for the binary `resolved` outcome and victim
+demographics as predictors.
+
+``` r
+fit_logistic = 
+  baltimore_df %>% 
+  glm(resolved ~ victim_age + victim_race + victim_sex, data = ., family = binomial())
+
+fit_logistic %>% 
+  broom::tidy() %>% 
+  mutate(
+    OR = exp(estimate)
+  ) %>% 
+  select(term, log_OR = estimate, OR, p.value) %>% 
+  knitr::kable(digits = 3)
+```
+
+| term                | log_OR |    OR | p.value |
+|:--------------------|-------:|------:|--------:|
+| (Intercept)         |  1.190 | 3.287 |   0.000 |
+| victim_age          | -0.007 | 0.993 |   0.027 |
+| victim_raceAsian    |  0.296 | 1.345 |   0.653 |
+| victim_raceBlack    | -0.842 | 0.431 |   0.000 |
+| victim_raceHispanic | -0.265 | 0.767 |   0.402 |
+| victim_raceOther    | -0.768 | 0.464 |   0.385 |
+| victim_sexMale      | -0.880 | 0.415 |   0.000 |
+
+Fitted values.
+
+``` r
+baltimore_df %>% 
+  modelr::add_predictions(fit_logistic) %>% 
+  mutate(fitted_prob = boot::inv.logit(pred))
+```
+
+    ## # A tibble: 2,827 × 6
+    ##    resolved victim_age victim_race victim_sex    pred fitted_prob
+    ##       <dbl>      <dbl> <fct>       <chr>        <dbl>       <dbl>
+    ##  1        0         17 Black       Male       -0.654        0.342
+    ##  2        0         26 Black       Male       -0.720        0.327
+    ##  3        0         21 Black       Male       -0.683        0.335
+    ##  4        1         61 White       Male       -0.131        0.467
+    ##  5        1         46 Black       Male       -0.864        0.296
+    ##  6        1         27 Black       Male       -0.727        0.326
+    ##  7        1         21 Black       Male       -0.683        0.335
+    ##  8        1         16 Black       Male       -0.647        0.344
+    ##  9        1         21 Black       Male       -0.683        0.335
+    ## 10        1         44 Black       Female      0.0297       0.507
+    ## # … with 2,817 more rows
