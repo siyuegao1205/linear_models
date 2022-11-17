@@ -82,19 +82,19 @@ Let’s make predictions and compute RMSEs.
 rmse(linear_mod, test_df)
 ```
 
-    ## [1] 0.9113684
+    ## [1] 0.9102863
 
 ``` r
 rmse(smooth_mod, test_df)
 ```
 
-    ## [1] 0.2872366
+    ## [1] 0.3623424
 
 ``` r
 rmse(wiggly_mod, test_df)
 ```
 
-    ## [1] 0.2517431
+    ## [1] 0.485361
 
 ``` r
 test_df %>% 
@@ -119,18 +119,18 @@ cv_df %>%
 ```
 
     ## # A tibble: 79 × 3
-    ##       id     x      y
-    ##    <int> <dbl>  <dbl>
-    ##  1     1 0.106  0.563
-    ##  2     2 0.965 -3.67 
-    ##  3     3 0.749 -1.50 
-    ##  4     5 0.783 -1.23 
-    ##  5     6 0.758 -1.04 
-    ##  6     7 0.859 -2.53 
-    ##  7     8 0.276  0.952
-    ##  8     9 0.944 -3.08 
-    ##  9    10 0.461  0.762
-    ## 10    11 0.466  1.02 
+    ##       id      x       y
+    ##    <int>  <dbl>   <dbl>
+    ##  1     1 0.997  -4.14  
+    ##  2     2 0.804  -2.05  
+    ##  3     4 0.962  -3.62  
+    ##  4     5 0.724  -1.05  
+    ##  5     7 0.710  -0.652 
+    ##  6     8 0.696  -0.884 
+    ##  7    10 0.559   0.405 
+    ##  8    11 0.673  -0.812 
+    ##  9    12 0.796  -1.61  
+    ## 10    15 0.0851 -0.0739
     ## # … with 69 more rows
 
 ``` r
@@ -138,15 +138,7 @@ cv_df = cv_df %>%
   mutate(
     train = map(train, as_tibble),
     test = map(test, as_tibble)
-  )
-```
-
-Fit models in each training model and then apply to the corresponding
-testing model.
-
-``` r
-cv_df =
-  cv_df %>% 
+  ) %>% 
   mutate(
     linear_fits = map(.x = train, ~ lm(y ~ x, data = .x)),
     smooth_fits = map(.x = train, ~ mgcv::gam(y ~ s(x), data = .x)),
@@ -159,18 +151,138 @@ cv_df =
   )
 ```
 
-Visualize the results.
+Make a box plot …
 
 ``` r
 cv_df %>% 
   select(starts_with("rmse")) %>% 
   pivot_longer(
     everything(),
-    names_to = "model", 
-    values_to = "rmse",
-    names_prefix = "rmse_") %>% 
-  mutate(model = fct_inorder(model)) %>% 
-  ggplot(aes(x = model, y = rmse)) + geom_violin()
+    names_to = "model",
+    names_prefix = "rmse_",
+    values_to = "rmse"
+  ) %>% 
+  ggplot(aes(x = model, y = rmse)) +
+  geom_boxplot()
 ```
 
-<img src="cross_validation_files/figure-gfm/unnamed-chunk-8-1.png" width="90%" />
+<img src="cross_validation_files/figure-gfm/unnamed-chunk-7-1.png" width="90%" />
+
+## Try it on a real dataset
+
+``` r
+growth_df = read_csv("data/nepalese_children.csv")
+```
+
+    ## Rows: 2705 Columns: 5
+    ## ── Column specification ────────────────────────────────────────────────────────
+    ## Delimiter: ","
+    ## dbl (5): age, sex, weight, height, armc
+    ## 
+    ## ℹ Use `spec()` to retrieve the full column specification for this data.
+    ## ℹ Specify the column types or set `show_col_types = FALSE` to quiet this message.
+
+``` r
+growth_df %>% 
+  ggplot(aes(x = weight, y = armc)) +
+  geom_point(alpha = .3)
+```
+
+<img src="cross_validation_files/figure-gfm/unnamed-chunk-9-1.png" width="90%" />
+
+Brief aside on piecewise linear model
+
+``` r
+growth_df =
+  growth_df %>% 
+  mutate(
+    weight_pwl = (weight > 7) * (weight - 7)
+  )
+```
+
+Compare 3 fitted models - linear model, smooth model, piecewise linear
+model
+
+``` r
+linear_model = lm(armc ~ weight, data = growth_df)
+pwl_model = lm(armc ~ weight + weight_pwl, data = growth_df)
+smooth_model = mgcv::gam(armc ~ s(weight), data = growth_df)
+```
+
+**Linear model.**
+
+``` r
+growth_df %>% 
+  add_predictions(linear_model) %>% 
+  ggplot(aes(x = weight, y = armc)) +
+  geom_point(alpha = .3) +
+  geom_line(aes(y = pred), color = "red")
+```
+
+<img src="cross_validation_files/figure-gfm/unnamed-chunk-12-1.png" width="90%" />
+
+**Piecewise linear model.**
+
+``` r
+growth_df %>% 
+  add_predictions(pwl_model) %>% 
+  ggplot(aes(x = weight, y = armc)) +
+  geom_point(alpha = .3) +
+  geom_line(aes(y = pred), color = "red")
+```
+
+<img src="cross_validation_files/figure-gfm/unnamed-chunk-13-1.png" width="90%" />
+
+**Smooth model.**
+
+``` r
+growth_df %>% 
+  add_predictions(smooth_model) %>% 
+  ggplot(aes(x = weight, y = armc)) +
+  geom_point(alpha = .3) +
+  geom_line(aes(y = pred), color = "red")
+```
+
+<img src="cross_validation_files/figure-gfm/unnamed-chunk-14-1.png" width="90%" />
+
+``` r
+cv_df = 
+  crossv_mc(growth_df, 100) %>% 
+  mutate(
+    train = map(train, as_tibble),
+    test = map(test, as_tibble)
+  ) 
+
+cv_df = 
+  cv_df %>% 
+  mutate(
+    linear_fits = map(.x = train, ~ lm(armc ~ weight, data = .x)),
+    pwl_fits    = map(.x = train, ~ lm(armc ~ weight + weight_pwl, data = .x)),
+    smooth_fits = map(.x = train, ~ mgcv::gam(armc ~ s(weight), data = .x))
+  ) %>% 
+  mutate(
+    rmse_linear = map2_dbl(.x = linear_fits, .y = test, ~ rmse(model = .x, data = .y)),
+    rmse_pwl    = map2_dbl(.x = pwl_fits,    .y = test, ~ rmse(model = .x, data = .y)),
+    rmse_smooth = map2_dbl(.x = smooth_fits, .y = test, ~ rmse(model = .x, data = .y))
+  )
+```
+
+Let’s look at the results.
+
+``` r
+cv_df %>% 
+  select(starts_with("rmse")) %>% 
+  pivot_longer(
+    everything(),
+    names_to = "model",
+    names_prefix = "rmse_",
+    values_to = "rmse"
+  ) %>% 
+  mutate(
+    model = fct_inorder(model)
+  ) %>% 
+  ggplot(aes(x = model, y = rmse)) +
+  geom_boxplot()
+```
+
+<img src="cross_validation_files/figure-gfm/unnamed-chunk-16-1.png" width="90%" />
