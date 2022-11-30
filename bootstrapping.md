@@ -20,7 +20,7 @@ sim_df_nonconst = sim_df_const %>%
 )
 ```
 
-Plot the datasets
+Plot the datasets.
 
 ``` r
 sim_df_const %>% 
@@ -39,3 +39,60 @@ sim_df_nonconst %>%
 ```
 
 <img src="bootstrapping_files/figure-gfm/unnamed-chunk-2-2.png" width="90%" />
+
+Fit the data with linear models.
+
+``` r
+lm(y ~ x, data = sim_df_const) %>% broom::tidy()
+```
+
+    ## # A tibble: 2 × 5
+    ##   term        estimate std.error statistic   p.value
+    ##   <chr>          <dbl>     <dbl>     <dbl>     <dbl>
+    ## 1 (Intercept)     1.98    0.0981      20.2 3.65e- 54
+    ## 2 x               3.04    0.0699      43.5 3.84e-118
+
+``` r
+lm(y ~ x, data = sim_df_nonconst) %>% broom::tidy()
+```
+
+    ## # A tibble: 2 × 5
+    ##   term        estimate std.error statistic   p.value
+    ##   <chr>          <dbl>     <dbl>     <dbl>     <dbl>
+    ## 1 (Intercept)     1.93    0.105       18.5 1.88e- 48
+    ## 2 x               3.11    0.0747      41.7 5.76e-114
+
+## Draw one bootstrap sample
+
+``` r
+boot_sample = function(df) {
+  
+  sample_frac(df, replace = TRUE) %>% 
+    arrange(x)
+  
+}
+```
+
+Check if this works …
+
+``` r
+boot_sample(sim_df_nonconst) %>% 
+  ggplot(aes(x = x, y = y)) +
+  geom_point(alpha = .3) +
+  geom_smooth(method = "lm") + 
+  ylim(-5, 16)
+```
+
+<img src="bootstrapping_files/figure-gfm/unnamed-chunk-5-1.png" width="90%" />
+
+``` r
+boot_sample(sim_df_nonconst) %>% 
+  lm(y ~ x, data = .) %>% 
+  broom::tidy()
+```
+
+    ## # A tibble: 2 × 5
+    ##   term        estimate std.error statistic   p.value
+    ##   <chr>          <dbl>     <dbl>     <dbl>     <dbl>
+    ## 1 (Intercept)     1.90    0.0982      19.3 2.45e- 51
+    ## 2 x               3.14    0.0688      45.6 1.18e-122

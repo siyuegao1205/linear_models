@@ -50,7 +50,7 @@ sim_df_nonconst = sim_df_const %>%
 )
 ```
 
-Plot the datasets
+Plot the datasets.
 
 ```{r}
 sim_df_const %>% 
@@ -64,3 +64,37 @@ sim_df_nonconst %>%
   geom_smooth(method = "lm")
 ```
 
+Fit the data with linear models.
+
+```{r}
+lm(y ~ x, data = sim_df_const) %>% broom::tidy()
+lm(y ~ x, data = sim_df_nonconst) %>% broom::tidy()
+```
+
+
+## Draw one bootstrap sample
+
+```{r}
+boot_sample = function(df) {
+  
+  sample_frac(df, replace = TRUE) %>% 
+    arrange(x)
+  
+}
+```
+
+Check if this works ...
+
+```{r}
+boot_sample(sim_df_nonconst) %>% 
+  ggplot(aes(x = x, y = y)) +
+  geom_point(alpha = .3) +
+  geom_smooth(method = "lm") + 
+  ylim(-5, 16)
+```
+
+```{r}
+boot_sample(sim_df_nonconst) %>% 
+  lm(y ~ x, data = .) %>% 
+  broom::tidy()
+```
